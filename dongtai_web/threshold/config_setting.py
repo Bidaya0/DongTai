@@ -184,7 +184,8 @@ def config_update(data, config_id):
     IastCircuitConfig.objects.filter(
         pk=config_id).update(**filted_data,
                              metric_types=metric_types,
-                             target_types=targets)
+                             target_types=targets,
+                             update_time=int(time.time()))
     IastCircuitTarget.objects.filter(
         circuit_config_id=config_id).delete()
     IastCircuitMetric.objects.filter(

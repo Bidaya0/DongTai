@@ -21,8 +21,16 @@ from dongtai_common.utils.systemsettings import get_circuit_break
 from django.utils.translation import gettext_lazy as _
 from result import Ok, Err, Result
 from dongtai_common.models.agent_config import MetricGroup
+from dongtai_common.common.utils import cached_decorator
 
 logger = logging.getLogger('dongtai.openapi')
+
+
+@cached_decorator(random_range=(30, 60), use_celery_update=False)
+def get_circuit_timestamp():
+    res = IastCircuitConfig.objects.order_by("-update_time").values_list(
+        'update_time', flat=True).first()
+    return res if res else 10
 
 
 class AgentConfigView(OpenApiEndPoint):
@@ -74,7 +82,8 @@ class AgentConfigv2View(OpenApiEndPoint):
             return R.failure(msg="agentId is None")
         if not get_circuit_break():
             return R.success(msg=_('Successfully'), data={})
-        res = get_agent_config(agent_id)
+        timestamp = get_circuit_timestamp()
+        res = get_agent_config(agent_id, timestamp)
         if isinstance(res, Err):
             return R.success(msg=_(res.value), data={})
         agent_config = res.value
@@ -127,8 +136,8 @@ def get_filter_by_target(target):
     opt_function = get_function(TargetType(target.opt))
     return lambda x: opt_function(x[targetattr], target.value)
 
-
-def get_agent_config(agent_id: int) -> Result:
+@cached_decorator(random_range=(60, 120), use_celery_update=False)
+def get_agent_config(agent_id: int, timestamp: int) -> Result:
     data = {
         "enableAutoFallback": True,
         "performanceLimitRiskMaxMetricsCount": 30,

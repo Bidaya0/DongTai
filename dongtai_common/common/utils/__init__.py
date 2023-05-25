@@ -47,9 +47,12 @@ def make_hash(obj):
     return hash(tuple(frozenset(new_obj.items())))
 
 
-def cached(function,
-           random_range: tuple = (50, 100),
-           use_celery_update: bool = False):
+def cached(
+    function,
+    random_range: tuple = (50, 100),
+    use_celery_update: bool = False,
+    extra_prefix: str = "",
+):
     """Return a version of this function that caches its results for
     the time specified.
 
@@ -68,8 +71,11 @@ def cached(function,
     def get_cache_or_call(*args, **kwargs):
         # known bug: if the function returns None, we never save it in
         # the cache
-        cache_key = make_hash(
-            (function.__module__ + function.__name__, args, kwargs))
+        cache_key = extra_prefix + function.__module__ + function.__name__ + make_hash(
+            (
+                args,
+                kwargs,
+            ))
         cached_result = cache.get(cache_key)
         if random_range:
             cache_time = random.randint(*random_range)
@@ -94,12 +100,14 @@ def disable_cache(function, args=(), kwargs={}):
         (function.__module__ + function.__name__, args, kwargs))
     cache.delete(cache_key)
 
-def cached_decorator(random_range, use_celery_update=False):
+
+def cached_decorator(random_range, use_celery_update=False, extra_prefix=""):
 
     def _noname(function):
         return cached(function,
                       random_range,
-                      use_celery_update=use_celery_update)
+                      use_celery_update=use_celery_update,
+                      extra_prefix=extra_prefix)
 
     return _noname
 
